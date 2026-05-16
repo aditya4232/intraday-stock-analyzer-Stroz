@@ -1,0 +1,25 @@
+[server]
+headless = true
+port = 8500
+maxUploadSize = 5
+enableXsrfProtection = true
+enableCORS = false
+
+[browser]
+gatherUsageStats = false
+
+[theme]
+base = "dark"
+primaryColor = "#2962FF"
+backgroundColor = "#0E0F10"
+secondaryBackgroundColor = "#1A1A1D"
+textColor = "#E0E0E0"
+font = "sans serif"
+
+[runner]
+fastReruns = true
+magicEnabled = false
+
+[global]
+showWarningOnDirectExecution = true
+dataFrameSerialization = "arrow"
