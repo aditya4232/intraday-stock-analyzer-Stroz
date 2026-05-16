@@ -3,7 +3,6 @@ headless = true
 port = 8500
 maxUploadSize = 5
 enableXsrfProtection = true
-enableCORS = false
 
 [browser]
 gatherUsageStats = false
@@ -22,4 +21,3 @@ magicEnabled = false
 
 [global]
 showWarningOnDirectExecution = true
-dataFrameSerialization = "arrow"
