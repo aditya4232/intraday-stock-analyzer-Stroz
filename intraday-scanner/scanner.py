@@ -229,56 +229,57 @@ def scan_stocks(
     total = len(symbols)
     deadline = datetime.now() + timedelta(seconds=SCAN_TIMEOUT_SECONDS)
 
-    # Progress tracking — use st.status for Streamlit >=1.28 compatibility
-    status_placeholder = st.empty()
-    with status_placeholder.container():
-        progress_bar = st.progress(0, text="Initializing scan...")
-        progress_text = st.markdown(
-            f"<small style='color: #888;'>Scanning {sector} ({total} stocks)...</small>",
-            unsafe_allow_html=True,
-        )
+    try:
+        # Progress tracking — use st.status for Streamlit >=1.28 compatibility
+        status_placeholder = st.empty()
+        with status_placeholder.container():
+            progress_bar = st.progress(0, text="Initializing scan...")
+            progress_text = st.markdown(
+                f"<small style='color: #888;'>Scanning {sector} ({total} stocks)...</small>",
+                unsafe_allow_html=True,
+            )
 
-        for idx, symbol in enumerate(symbols):
-            # Enforce time budget for free-tier timeout safety
-            if datetime.now() >= deadline:
-                logger.warning("Scan timeout reached after %d/%d stocks", idx, total)
-                break
+            for idx, symbol in enumerate(symbols):
+                if datetime.now() >= deadline:
+                    logger.warning("Scan timeout reached after %d/%d stocks", idx, total)
+                    break
 
-            try:
-                pct = (idx + 1) / total
-                progress_bar.progress(pct)
-                progress_text.markdown(
-                    f"<small style='color: #888;'>[{idx + 1}/{total}] {symbol.replace('.NS', '')}...</small>",
-                    unsafe_allow_html=True,
-                )
+                try:
+                    pct = (idx + 1) / total
+                    progress_bar.progress(pct)
+                    progress_text.markdown(
+                        f"<small style='color: #888;'>[{idx + 1}/{total}] {symbol.replace('.NS', '')}...</small>",
+                        unsafe_allow_html=True,
+                    )
 
-                raw_symbol = symbol.replace(".NS", "")
-                df = _fetch_node(symbol)
+                    raw_symbol = symbol.replace(".NS", "")
+                    df = _fetch_node(symbol)
 
-                if df is None:
+                    if df is None:
+                        continue
+
+                    df.attrs["symbol"] = raw_symbol
+
+                    result = _indicator_node(df)
+                    if result is None:
+                        continue
+
+                    if result["Score"] < min_score:
+                        continue
+                    if min_rsi > 0 and result["RSI"] < min_rsi:
+                        continue
+
+                    results.append(result)
+
+                except Exception as e:
+                    logger.warning("Pipeline error for %s: %s", symbol, e)
                     continue
+                finally:
+                    _time.sleep(SCAN_RATE_LIMIT_SECONDS)
 
-                df.attrs["symbol"] = raw_symbol
-
-                result = _indicator_node(df)
-                if result is None:
-                    continue
-
-                if result["Score"] < min_score:
-                    continue
-                if min_rsi > 0 and result["RSI"] < min_rsi:
-                    continue
-
-                results.append(result)
-
-            except Exception as e:
-                logger.warning("Pipeline error for %s: %s", symbol, e)
-                continue
-            finally:
-                _time.sleep(SCAN_RATE_LIMIT_SECONDS)
-
-    status_placeholder.empty()
-    _SCAN_IN_PROGRESS = False
+        status_placeholder.empty()
+    finally:
+        _SCAN_IN_PROGRESS = False
 
     if not results:
         return pd.DataFrame()
