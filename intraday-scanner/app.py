@@ -405,7 +405,7 @@ if "min_rsi" not in st.session_state:
 # Auto-refresh
 # ---------------------------------------------------------------------------
 if st.session_state.auto_refresh and _HAS_AUTOREFRESH:
-    _ = st_autorefresh(interval=AUTO_REFRESH_INTERVAL_MS, key="auto_refresh")
+    _ = st_autorefresh(interval=AUTO_REFRESH_INTERVAL_MS, key="auto_refresh_timer")
 
 # ---------------------------------------------------------------------------
 # Header
@@ -499,9 +499,9 @@ with st.sidebar:
     st.markdown("---")
 
     # Auto refresh toggle
-    auto_refresh = st.checkbox(
+    _ = st.checkbox(
         "Auto Refresh (every 60s)",
-        value=st.session_state.auto_refresh,
+        key="auto_refresh",
         help="Automatically refresh data every 60 seconds",
     )
 
@@ -538,7 +538,6 @@ with st.sidebar:
 # ---------------------------------------------------------------------------
 # Update session state
 # ---------------------------------------------------------------------------
-st.session_state.auto_refresh = auto_refresh
 st.session_state.sector = selected_sector
 st.session_state.min_score = min_score
 st.session_state.min_rsi = min_rsi
