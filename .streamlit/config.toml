@@ -1,6 +1,5 @@
 [server]
 headless = true
-port = 8500
 maxUploadSize = 5
 enableXsrfProtection = true
 
