@@ -279,7 +279,7 @@ st.markdown(
 # ---------------------------------------------------------------------------
 # Imports (after page config)
 # ---------------------------------------------------------------------------
-from scanner import scan_stocks, calculate_target_sl, scrape_and_scan
+from scanner import scan_stocks, calculate_target_sl
 from indicators import (
     calculate_vwap,
     calculate_ema,
@@ -445,8 +445,8 @@ with col_refresh:
 st.markdown("<hr style='margin: 8px 0 16px 0;'>", unsafe_allow_html=True)
 
 if not market_open:
-    from datetime import timedelta as td
-    ist_now = datetime.datetime.now(td(hours=5, minutes=30))
+    from datetime import timedelta as td, timezone as tz
+    ist_now = datetime.datetime.now(tz=tz(td(hours=5, minutes=30)))
     next_open = ist_now.replace(hour=9, minute=15, second=0, microsecond=0)
     if ist_now.hour >= 15 or (ist_now.hour == 15 and ist_now.minute >= 30):
         next_open += td(days=1)
@@ -510,7 +510,7 @@ with st.sidebar:
     )
 
     scan_clicked = st.button(
-        "\U0001F50D Scan Now", type="primary", use_container_width=True,
+        "\U0001F50D Scan Now", type="primary", width="stretch",
     )
 
     st.markdown("---")
@@ -605,14 +605,14 @@ with tab_scanner:
     if should_scan:
         with st.spinner(f"\U0001F50D Scanning {selected_sector} sector..."):
             try:
-                scan_output = scrape_and_scan(
+                results = scan_stocks(
                     sector=selected_sector,
                     min_score=min_score,
                     min_rsi=min_rsi,
                 )
-                results = scan_output["results"]
+                
                 st.session_state.scan_results = results
-                st.session_state.sector_dataframe = scan_output.get("sector_dataframe", pd.DataFrame())
+                st.session_state.sector_dataframe = pd.DataFrame()
                 st.session_state.last_scan_time = datetime.datetime.now()
             except Exception as e:
                 st.error(f"Scan failed: {str(e)}")
@@ -709,7 +709,7 @@ with tab_scanner:
         styled_df = style_dataframe(display_df)
         st.dataframe(
             styled_df,
-            use_container_width=True,
+            width="stretch",
             height=min(60 * len(display_df) + 40, 600),
         )
 
@@ -752,7 +752,7 @@ with tab_scanner:
 
                 if chart_df is not None and not chart_df.empty:
                     fig = create_candlestick_chart(chart_df, selected_chart_stock)
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, width="stretch")
                 else:
                     st.warning(f"Could not load chart data for {selected_chart_stock}")
 
@@ -767,7 +767,7 @@ with tab_scanner:
                 data=csv_data,
                 file_name=f"scanner_results_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.csv",
                 mime="text/csv",
-                use_container_width=True,
+                width="stretch",
             )
         with col_xlsx:
             xlsx_data = export_to_excel(results)
@@ -776,7 +776,7 @@ with tab_scanner:
                 data=xlsx_data,
                 file_name=f"scanner_results_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True,
+                width="stretch",
             )
 
 # ---------------------------------------------------------------------------
@@ -809,7 +809,7 @@ with tab_sectors:
                 font=dict(color="#E0E0E0"), xaxis_tickangle=-45,
             )
             fig_sector.update_traces(textposition="outside")
-            st.plotly_chart(fig_sector, use_container_width=True)
+            st.plotly_chart(fig_sector, width="stretch")
 
         with col2:
             sector_melted = sector_df.melt(
@@ -832,7 +832,7 @@ with tab_sectors:
                 xaxis_tickangle=-45,
             )
             fig_stacked.update_traces(textposition="inside")
-            st.plotly_chart(fig_stacked, use_container_width=True)
+            st.plotly_chart(fig_stacked, width="stretch")
 
         st.markdown("### \U0001F4CB Sector Details")
         st.dataframe(
@@ -845,7 +845,7 @@ with tab_sectors:
                 {"selector": "tbody tr:nth-child(odd)", "props": "background-color: #222222;"},
                 {"selector": "td", "props": "padding: 6px 12px; color: #E0E0E0;"},
             ]),
-            use_container_width=True,
+            width="stretch",
         )
 
         st.markdown("### \U0001F3C6 Nifty 50 Sector Distribution")
@@ -864,7 +864,7 @@ with tab_sectors:
                 height=450, font=dict(color="#E0E0E0"),
             )
             fig_pie.update_traces(textposition="inside", textinfo="label+percent")
-            st.plotly_chart(fig_pie, use_container_width=True)
+            st.plotly_chart(fig_pie, width="stretch")
     else:
         st.info("Run a scan first to see sector breakdown.")
 
@@ -922,7 +922,7 @@ with tab_toppicks:
 
             st.dataframe(
                 style_dataframe(tp_df),
-                use_container_width=True,
+                width="stretch",
             )
         else:
             st.info("No top picks available. Run a scan first.")

@@ -119,12 +119,17 @@ def _fetch_node(symbol: str, progress_callback: Optional[Callable] = None) -> Op
             if isinstance(df.index, pd.DatetimeIndex):
                 df.attrs["last_price_time"] = df.index[-1]
                 # Estimate age in seconds (rough, for display)
-                now_utc = datetime.now(timedelta(hours=0))
                 last = df.index[-1]
                 if hasattr(last, 'tzinfo') and last.tzinfo is not None:
-                    df.attrs["data_age_seconds"] = (datetime.now(last.tzinfo) - last).total_seconds()
+                    now = datetime.now(tz=last.tzinfo)
+                    df.attrs["data_age_seconds"] = (now - last).total_seconds()
                 else:
-                    df.attrs["data_age_seconds"] = 0
+                    now = datetime.utcnow()
+                    # last may be timezone-naive; compute difference in seconds
+                    try:
+                        df.attrs["data_age_seconds"] = (now - last.to_pydatetime()).total_seconds()
+                    except Exception:
+                        df.attrs["data_age_seconds"] = 0
 
             return df
 
@@ -348,6 +353,24 @@ def scan_stocks(
     ).reset_index(drop=True)
 
     return df_results
+
+
+def scrape_and_scan(sector: str, min_score: int = 0, min_rsi: float = 0.0) -> dict:
+    """Compatibility wrapper expected by `app.py`.
+
+    Returns a dict containing `results` (DataFrame) and `sector_dataframe` (summary).
+    """
+    df = scan_stocks(sector=sector, min_score=min_score, min_rsi=min_rsi)
+    if df is None or df.empty:
+        return {"results": pd.DataFrame(), "sector_dataframe": pd.DataFrame()}
+
+    # Build a simple sector summary dataframe
+    try:
+        sector_df = df.groupby("Sector").size().reset_index(name="Count")
+    except Exception:
+        sector_df = pd.DataFrame()
+
+    return {"results": df, "sector_dataframe": sector_df}
 
 
 def scan_stocks_silent(
