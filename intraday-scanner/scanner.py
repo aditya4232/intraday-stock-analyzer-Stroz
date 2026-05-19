@@ -4,7 +4,7 @@ scanner.py — Graph-Pipeline Scanning Engine
 Inspired by ScrapeGraphAI's node-based pipeline architecture.
 
 Pipeline:
-  [FetchNode] -> [IndicatorNode] -> [EvaluateNode] -> [ScoreNode] -> [RenderNode]
+  [SearchNode] -> [FetchNode] -> [IndicatorNode] -> [EvaluateNode] -> [ScoreNode] -> [RenderNode]
 
 Each node in the pipeline is a self-contained step. The pipeline is orchestrated
 by scan_stocks() which handles:
@@ -13,6 +13,7 @@ by scan_stocks() which handles:
   - Rate limiting between API calls
   - Filtering by score/RSI thresholds
   - DataFrame assembly with targets and stoplosses
+  - Nifty 50 membership and sector categorization
 """
 
 import logging
@@ -32,7 +33,16 @@ from indicators import (
     classify_action,
     get_comment,
 )
-from stocks_db import get_symbols
+from stocks_db import (
+    get_symbols,
+    get_sector_for_symbol,
+    get_company_name,
+    get_market_cap,
+    get_sectoral_index,
+    is_nifty50,
+    NIFTY50_SYMBOLS,
+    STOCK_SECTORS,
+)
 from ml_model import analyze_stock
 from config import (
     SCAN_RETRY_COUNT,
@@ -104,6 +114,17 @@ def _fetch_node(symbol: str, progress_callback: Optional[Callable] = None) -> Op
             if len(df) < 25:
                 return None
 
+            # Record data freshness: timestamp of the last candle
+            if isinstance(df.index, pd.DatetimeIndex):
+                df.attrs["last_price_time"] = df.index[-1]
+                # Estimate age in seconds (rough, for display)
+                now_utc = datetime.now(timedelta(hours=0))
+                last = df.index[-1]
+                if hasattr(last, 'tzinfo') and last.tzinfo is not None:
+                    df.attrs["data_age_seconds"] = (datetime.now(last.tzinfo) - last).total_seconds()
+                else:
+                    df.attrs["data_age_seconds"] = 0
+
             return df
 
         except Exception as e:
@@ -147,8 +168,34 @@ def _indicator_node(df: pd.DataFrame) -> dict | None:
         # ML analysis (confidence, anomaly, pattern, sentiment)
         ml_result = analyze_stock(df, conditions)
 
+        # Sector and index membership metadata
+        raw_symbol = df.attrs.get("symbol", "")
+        sector_name = get_sector_for_symbol(raw_symbol)
+        nifty50_flag = is_nifty50(raw_symbol)
+        company_name = get_company_name(raw_symbol)
+        market_cap = get_market_cap(raw_symbol)
+        sectoral_index = get_sectoral_index(raw_symbol)
+
+        # Data freshness
+        data_age = df.attrs.get("data_age_seconds", 0)
+        last_price_time = df.attrs.get("last_price_time", None)
+        if last_price_time is not None:
+            time_str = last_price_time.strftime("%H:%M:%S")
+            # Mark as delayed if data is older than 10 minutes
+            is_delayed = data_age > 600
+            freshness = f"Delayed ({time_str})" if is_delayed else f"Live ({time_str})"
+        else:
+            freshness = "Unknown"
+
         return {
-            "Symbol": df.attrs.get("symbol", ""),
+            "Symbol": raw_symbol,
+            "Company": company_name,
+            "Sector": sector_name,
+            "Market Cap": market_cap,
+            "Sectoral Index": sectoral_index if sectoral_index else "",
+            "Index": "NIFTY 50" if nifty50_flag else "Broader Market",
+            "Price Time": freshness,
+            "Data Age (s)": int(data_age),
             "LTP": round(ltp, 2),
             "VWAP": round(vwap_val, 2),
             "5EMA": round(ema5_val, 2),
@@ -213,7 +260,7 @@ def scan_stocks(
     Returns
     -------
     pd.DataFrame
-        Results sorted by Score descending
+        Results sorted by Score descending, with Sector and Index columns
     """
     global _SCAN_IN_PROGRESS
     if _SCAN_IN_PROGRESS:
@@ -344,12 +391,59 @@ def scan_stocks_silent(
     return df_results
 
 
+# ---------------------------------------------------------------------------
+# ScrapeGraphAI-style scraping entry point (convenience)
+# ---------------------------------------------------------------------------
+def scrape_and_scan(
+    sector: str = "All Sectors",
+    min_score: int = 0,
+    min_rsi: float = 0.0,
+) -> dict:
+    """
+    Run the full ScrapeGraphAI-style scraping pipeline then scan.
+
+    Returns a dict with:
+      - 'results': scanned DataFrame (same as scan_stocks)
+      - 'sector_summary': dict of sector-wise stats
+      - 'nifty50_count': number of Nifty 50 stocks in results
+      - 'broader_count': number of broader market stocks in results
+
+    This integrates the scraper.py graph with the existing scanner pipeline.
+    """
+    from scraper import scrape_nse_data
+
+    # Step 1: Run the scraping graph to get initial data
+    scrape_result = scrape_nse_data(sector=sector)
+    scraped_df = scrape_result.get("results_dataframe", pd.DataFrame())
+    sector_summary = scrape_result.get("sector_summary", {})
+
+    # Step 2: Run the scanner pipeline
+    scan_df = scan_stocks(sector=sector, min_score=min_score, min_rsi=min_rsi)
+
+    # Step 3: Compute Nifty 50 vs broader counts
+    nifty50_count = 0
+    broader_count = 0
+    if not scan_df.empty and "Index" in scan_df.columns:
+        nifty50_count = int((scan_df["Index"] == "NIFTY 50").sum())
+        broader_count = len(scan_df) - nifty50_count
+
+    return {
+        "results": scan_df,
+        "scraped_data": scraped_df,
+        "sector_summary": sector_summary,
+        "sector_dataframe": scrape_result.get("sector_dataframe", pd.DataFrame()),
+        "nifty50_count": nifty50_count,
+        "broader_count": broader_count,
+        "total_scanned": len(scan_df),
+    }
+
+
 if __name__ == "__main__":
     # Quick self-test
     print("Testing scanner pipeline...")
     df = scan_stocks_silent("Banking", min_score=0)
     if not df.empty:
         print(f"Found {len(df)} stocks meeting criteria")
-        print(df[["Symbol", "LTP", "RSI", "Score", "Action"]].head(10).to_string())
+        print(df[["Symbol", "Sector", "Index", "LTP", "RSI", "Score", "Action"]].head(10).to_string())
     else:
         print("No stocks found (market may be closed)")

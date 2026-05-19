@@ -154,7 +154,7 @@ def export_to_csv(df: pd.DataFrame) -> bytes:
     output = io.BytesIO()
     df_to_export = df.copy()
     # Remove helper condition columns
-    helper_cols = ["▴ VWAP", "▴ EMA", "▴ RSI", "▴ Vol", "▴ Brk", "Green"]
+    helper_cols = ["▴ VWAP", "▴ EMA", "▴ RSI", "▴ Vol", "▴ Brk", "Green", "Anomaly"]
     df_to_export = df_to_export.drop(
         columns=[c for c in helper_cols if c in df_to_export.columns],
         errors="ignore",
@@ -180,7 +180,7 @@ def export_to_excel(df: pd.DataFrame) -> bytes:
     """
     output = io.BytesIO()
     df_to_export = df.copy()
-    helper_cols = ["▴ VWAP", "▴ EMA", "▴ RSI", "▴ Vol", "▴ Brk", "Green"]
+    helper_cols = ["▴ VWAP", "▴ EMA", "▴ RSI", "▴ Vol", "▴ Brk", "Green", "Anomaly"]
     df_to_export = df_to_export.drop(
         columns=[c for c in helper_cols if c in df_to_export.columns],
         errors="ignore",

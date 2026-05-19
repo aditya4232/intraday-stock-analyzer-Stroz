@@ -165,6 +165,38 @@ Edit `app.py` — change `interval=60_000` (milliseconds) in the `st_autorefresh
 ### Adjusting scoring thresholds
 Edit `indicators.py` — modify `compute_score()` and `classify_action()` functions.
 
+### Secrets & LLM configuration (important)
+
+This project can optionally use ScrapeGraphAI or other LLM providers for enhanced scraping and company info. Do NOT commit secrets into the repository. Recommended approaches:
+
+- Create a local `.env` (copy `.env.example`) and add your key:
+
+```bash
+# Linux / macOS
+cp .env.example .env
+# edit .env and paste your key as SCRAPEGRAPHAI_CLOUD_API_KEY=
+
+# Windows (PowerShell)
+copy .env.example .env
+# edit .env in Notepad and paste your key
+```
+
+- Environment variable names the code expects:
+     - `SCRAPEGRAPHAI_CLOUD_API_KEY` — ScrapeGraphAI cloud key (format: `sgai-...`) (preferred)
+     - `SCRAPE_LLM_API_KEY` — alternative place for an `sgai-...` key
+     - `SCRAPE_LLM_PROVIDER` — `openai`, `ollama`, or `gemini` (default `ollama`)
+     - `SCRAPE_LLM_MODEL` — model name (e.g. `gpt-4o`, `ollama/llama3`)
+
+- On Windows you can also set the key permanently (PowerShell):
+
+```powershell
+setx SCRAPEGRAPHAI_CLOUD_API_KEY "sgai-..."
+```
+
+- For deployment (Streamlit Cloud, Render, Railway, etc.) use the platform's secret/env settings — do NOT put secrets in source.
+
+If you share the key here, I will not commit it into the repo. Instead, follow one of the secure options above and the code will pick it up automatically from the environment or `.env` file.
+
 ---
 
 ## 📊 Tech Stack
