@@ -534,8 +534,8 @@ with st.sidebar:
 
     # Market countdown
     if market_open:
-        from datetime import datetime as dt, time as tm, timedelta as td
-        ist_now = dt.now(td(hours=5, minutes=30))
+        from datetime import datetime as dt, time as tm, timedelta as td, timezone as tz
+        ist_now = dt.now(tz=tz(td(hours=5, minutes=30)))
         close_today = ist_now.replace(hour=15, minute=30, second=0, microsecond=0)
         remaining = close_today - ist_now
         mins_left = int(remaining.total_seconds() // 60)
@@ -545,8 +545,8 @@ with st.sidebar:
             unsafe_allow_html=True,
         )
     else:
-        from datetime import datetime as dt, time as tm, timedelta as td
-        ist_now = dt.now(td(hours=5, minutes=30))
+        from datetime import datetime as dt, time as tm, timedelta as td, timezone as tz
+        ist_now = dt.now(tz=tz(td(hours=5, minutes=30)))
         next_open = ist_now.replace(hour=9, minute=15, second=0, microsecond=0)
         if ist_now >= next_open:
             next_open += td(days=1)
