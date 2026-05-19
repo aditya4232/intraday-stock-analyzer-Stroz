@@ -14,7 +14,7 @@ load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
 
 SCAN_RETRY_COUNT: int = int(os.getenv("SCAN_RETRY_COUNT", "1"))
-SCAN_RATE_LIMIT_SECONDS: float = float(os.getenv("SCAN_RATE_LIMIT_SECONDS", "0.15"))
+SCAN_RATE_LIMIT_SECONDS: float = float(os.getenv("SCAN_RATE_LIMIT_SECONDS", "1.0"))
 AUTO_REFRESH_INTERVAL_MS: int = int(os.getenv("AUTO_REFRESH_INTERVAL_MS", "60000"))
 SCAN_TIMEOUT_SECONDS: int = int(os.getenv("SCAN_TIMEOUT_SECONDS", "45"))
 

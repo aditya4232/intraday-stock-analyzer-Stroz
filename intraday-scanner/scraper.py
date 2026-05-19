@@ -46,10 +46,12 @@ logger = logging.getLogger(__name__)
 # Load LLM config from environment (with sensible defaults for local/Ollama)
 SCRAPE_LLM_MODEL = os.getenv("SCRAPE_LLM_MODEL", "")
 SCRAPE_LLM_API_KEY = os.getenv("SCRAPE_LLM_API_KEY", "")
-SCRAPE_LLM_PROVIDER = os.getenv("SCRAPE_LLM_PROVIDER", "ollama")
+# Default provider is empty so that open-source fallbacks are primary
+SCRAPE_LLM_PROVIDER = os.getenv("SCRAPE_LLM_PROVIDER", "")
 
 # ScrapeGraphAI Cloud API key (format: sgai-...)
 # When set, the library uses ScrapeGraphAI's cloud service instead of a local LLM.
+# Leave unset by default; treat ScrapeGraphAI as a fallback when explicitly configured.
 SCRAPEGRAPHAI_CLOUD_API_KEY = os.getenv("SCRAPEGRAPHAI_CLOUD_API_KEY", "")
 
 _HAS_SGAI = False
@@ -78,7 +80,8 @@ def _build_sgai_config() -> dict | None:
     api_key = SCRAPE_LLM_API_KEY.strip()
     provider = SCRAPE_LLM_PROVIDER.strip().lower()
 
-    # --- ScrapeGraphAI Cloud (highest priority) ---
+    # Prefer open-source fallback (no LLM configured) unless explicit cloud/provider config present
+    # --- ScrapeGraphAI Cloud (only if explicitly configured) ---
     if cloud_api_key:
         logger.info("Using ScrapeGraphAI Cloud API")
         return {
@@ -89,7 +92,7 @@ def _build_sgai_config() -> dict | None:
             },
         }
 
-    # --- ScrapeGraphAI Cloud via SCRAPE_LLM_API_KEY with sgai- prefix ---
+    # --- ScrapeGraphAI Cloud via SCRAPE_LLM_API_KEY with sgai- prefix (explicit) ---
     if api_key.startswith("sgai-"):
         logger.info("Using ScrapeGraphAI Cloud API (via SCRAPE_LLM_API_KEY)")
         return {
@@ -100,9 +103,10 @@ def _build_sgai_config() -> dict | None:
             },
         }
 
-    # --- Ollama default (no model specified) ---
-    if not model and provider == "ollama":
-        model = "ollama/llama3"
+    # --- Ollama default (only if SCRAPE_LLM_PROVIDER explicitly set to 'ollama') ---
+    if provider == "ollama":
+        # fall back to local Ollama if requested
+        model = model or "ollama/llama3"
         return {
             "llm": {
                 "model": model,
@@ -293,19 +297,30 @@ def scrape_live_price(symbol: str) -> dict | None:
     dict or None
         {'price': float, 'change': float, 'change_percent': float, ...} or None
     """
-    # Step 1: ScrapeGraphAI with LLM
-    if _HAS_SGAI and _build_sgai_config() is not None:
-        result = _scrape_google_finance_sgai(symbol)
-        if result and "price" in result:
-            logger.info("ScrapeGraphAI scraped %s: price=%s", symbol, result.get("price"))
-            return result
+    # Prefer open-source scraping (BeautifulSoup) as primary to avoid cloud rate limits.
+    # If ScrapeGraphAI is explicitly configured (cloud key or provider), it will be used as a fallback.
 
-    # Step 2: BeautifulSoup fallback
-    result = _scrape_google_finance_bs4(symbol)
-    if result and "price" in result:
-        logger.info("BS4 scraped %s: price=%s", symbol, result.get("price"))
-        return result
+    # Step 1: Try BeautifulSoup fallback (free, unlimited)
+    try:
+        result_bs4 = _scrape_google_finance_bs4(symbol)
+        if result_bs4 and "price" in result_bs4:
+            logger.info("BS4 scraped %s: price=%s", symbol, result_bs4.get("price"))
+            return result_bs4
+    except Exception as e:
+        logger.debug("BS4 scraper failed for %s: %s", symbol, e)
 
+    # Step 2: If BS4 failed, and ScrapeGraphAI is available and explicitly configured, try it
+    try:
+        config = _build_sgai_config()
+        if _HAS_SGAI and config is not None:
+            result_sgai = _scrape_google_finance_sgai(symbol)
+            if result_sgai and "price" in result_sgai:
+                logger.info("ScrapeGraphAI scraped %s: price=%s", symbol, result_sgai.get("price"))
+                return result_sgai
+    except Exception as e:
+        logger.debug("ScrapeGraphAI scraper failed for %s: %s", symbol, e)
+
+    # Nothing succeeded
     return None
 
 

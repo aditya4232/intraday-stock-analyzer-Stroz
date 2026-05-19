@@ -69,6 +69,7 @@ def _fetch_node(symbol: str, progress_callback: Optional[Callable] = None) -> Op
     import yfinance as yf
 
     max_retries = SCAN_RETRY_COUNT
+    backoff_base = 1.0
     for attempt in range(1, max_retries + 1):
         try:
             if progress_callback:
@@ -128,7 +129,15 @@ def _fetch_node(symbol: str, progress_callback: Optional[Callable] = None) -> Op
             return df
 
         except Exception as e:
+            # If yfinance or remote source rate-limited us, apply exponential backoff
+            msg = str(e).lower()
             logger.warning("FetchNode failed for %s (attempt %d): %s", symbol, attempt, e)
+            if "too many requests" in msg or "rate limit" in msg or "429" in msg:
+                sleep_sec = backoff_base * (2 ** (attempt - 1))
+                sleep_sec = min(sleep_sec, 8)
+                logger.info("Rate limited when fetching %s — sleeping %.1fs before retry", symbol, sleep_sec)
+                _time.sleep(sleep_sec)
+                continue
             if attempt < max_retries:
                 _time.sleep(1)
                 continue
