@@ -2,8 +2,7 @@
 indicators.py — Technical Indicator Engine
 ===========================================
 Implements all technical indicators used by the scanner.
-Inspired by ScrapeGraphAI's node-based pipeline architecture:
-each indicator function is a self-contained, testable "node".
+Each indicator function is a self-contained, testable "node".
 
 Indicators:
   - VWAP (Volume Weighted Average Price)

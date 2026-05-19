@@ -5,8 +5,8 @@ Professional intraday stock scanner dashboard for NSE equities.
 
 Architecture:
   - Frontend: Streamlit with custom dark theme (Bloomberg-style)
-  - Backend: Graph-pipeline scanner (inspired by ScrapeGraphAI)
-  - Data: ScrapeGraphAI-style scraping graph + yfinance for 5-minute intraday data
+  - Backend: Graph-pipeline scanner
+  - Data: yfinance for 5-minute intraday data
   - Charts: Plotly candlestick with VWAP + EMA overlays
   - Coverage: Nifty 50 + 200+ extended stocks, categorized by sector
 
@@ -56,52 +56,6 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-
-# ---------------------------------------------------------------------------
-# Startup / Preflight checks (display helpful warnings when deploying)
-# ---------------------------------------------------------------------------
-def render_startup_checks() -> None:
-    """Display Streamlit warnings or info about missing LLM/API configuration."""
-    try:
-        # Import scraper helper to inspect LLM/SGAI config
-        import scraper as _scraper
-        cfg = None
-        try:
-            cfg = _scraper._build_sgai_config()
-        except Exception:
-            cfg = None
-
-        # Is scrapegraphai package available?
-        try:
-            import scrapegraphai  # type: ignore
-            _has_sgai_pkg = True
-        except Exception:
-            _has_sgai_pkg = False
-
-        if cfg is None:
-            st.warning(
-                "No LLM / ScrapeGraphAI configuration detected. "
-                "ScrapeGraphAI features will be disabled and the app will fall back to BeautifulSoup/yfinance. "
-                "To enable ScrapeGraphAI, set `SCRAPEGRAPHAI_CLOUD_API_KEY` (sgai-...) or configure `SCRAPE_LLM_PROVIDER`/`SCRAPE_LLM_API_KEY`. "
-                "See the README for secure setup instructions."
-            )
-        else:
-            # Config exists; ensure the package is installed for cloud usage
-            if not _has_sgai_pkg and (cfg.get("api_key") or cfg.get("llm", {}).get("api_key")):
-                st.error(
-                    "ScrapeGraphAI configuration found but the `scrapegraphai` package is not installed. "
-                    "Install it with `pip install scrapegraphai` or remove cloud config to use the fallback scrapers."
-                )
-            else:
-                st.info("LLM / ScrapeGraphAI configuration detected — enhanced scraping enabled.")
-
-    except Exception:
-        # Non-fatal: don't stop the app if checks fail
-        return
-
-
-# Render startup checks (shown above the UI)
-render_startup_checks()
 
 # ---------------------------------------------------------------------------
 # Custom CSS — Bloomberg Terminal Dark Theme
@@ -411,7 +365,7 @@ with col_title:
     st.markdown(
         "<h1 style='margin: 0; font-size: 1.5rem;'>AI Intraday Trading Scanner</h1>"
         "<p style='margin: 0; color: #666; font-size: 0.75rem;'>"
-        "NSE Equity Scanner \u00B7 Nifty 50 + 200+ Stocks \u00B7 ScrapeGraphAI Pipeline \u00B7 5min Data</p>",
+        "NSE Equity Scanner \u00B7 Nifty 50 + 200+ Stocks \u00B7 Automated Pipeline \u00B7 5min Data</p>",
         unsafe_allow_html=True,
     )
 
@@ -570,7 +524,7 @@ with st.sidebar:
     st.markdown("---")
     st.markdown(
         "<div style='font-size: 0.7rem; color: #555; text-align: center;'>"
-        "Data: yfinance + ScrapeGraphAI<br>"
+        "Data: yfinance<br>"
         "Nifty 50 + 300+ Stocks<br>"
         "v3.0.0</div>",
         unsafe_allow_html=True,
@@ -741,10 +695,6 @@ with tab_scanner:
                     f"&nbsp;&middot;&nbsp; {sym_market_cap}"
                     f"&nbsp;&middot;&nbsp; {sym_price_time}"
                     f"</p>",
-                    unsafe_allow_html=True,
-                )
-                st.markdown(
-                    f"<p style='color: #888; font-size: 0.8rem;'>{sym_sector} &nbsp;&middot;&nbsp; {index_badge}</p>",
                     unsafe_allow_html=True,
                 )
 

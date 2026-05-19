@@ -1,7 +1,7 @@
 """
 scanner.py — Graph-Pipeline Scanning Engine
 ============================================
-Inspired by ScrapeGraphAI's node-based pipeline architecture.
+Node-based pipeline architecture.
 
 Pipeline:
   [SearchNode] -> [FetchNode] -> [IndicatorNode] -> [EvaluateNode] -> [ScoreNode] -> [RenderNode]
@@ -40,8 +40,6 @@ from stocks_db import (
     get_market_cap,
     get_sectoral_index,
     is_nifty50,
-    NIFTY50_SYMBOLS,
-    STOCK_SECTORS,
 )
 from ml_model import analyze_stock
 from config import (
@@ -355,24 +353,6 @@ def scan_stocks(
     return df_results
 
 
-def scrape_and_scan(sector: str, min_score: int = 0, min_rsi: float = 0.0) -> dict:
-    """Compatibility wrapper expected by `app.py`.
-
-    Returns a dict containing `results` (DataFrame) and `sector_dataframe` (summary).
-    """
-    df = scan_stocks(sector=sector, min_score=min_score, min_rsi=min_rsi)
-    if df is None or df.empty:
-        return {"results": pd.DataFrame(), "sector_dataframe": pd.DataFrame()}
-
-    # Build a simple sector summary dataframe
-    try:
-        sector_df = df.groupby("Sector").size().reset_index(name="Count")
-    except Exception:
-        sector_df = pd.DataFrame()
-
-    return {"results": df, "sector_dataframe": sector_df}
-
-
 def scan_stocks_silent(
     sector: str,
     min_score: int = 0,
@@ -421,53 +401,6 @@ def scan_stocks_silent(
     ).reset_index(drop=True)
 
     return df_results
-
-
-# ---------------------------------------------------------------------------
-# ScrapeGraphAI-style scraping entry point (convenience)
-# ---------------------------------------------------------------------------
-def scrape_and_scan(
-    sector: str = "All Sectors",
-    min_score: int = 0,
-    min_rsi: float = 0.0,
-) -> dict:
-    """
-    Run the full ScrapeGraphAI-style scraping pipeline then scan.
-
-    Returns a dict with:
-      - 'results': scanned DataFrame (same as scan_stocks)
-      - 'sector_summary': dict of sector-wise stats
-      - 'nifty50_count': number of Nifty 50 stocks in results
-      - 'broader_count': number of broader market stocks in results
-
-    This integrates the scraper.py graph with the existing scanner pipeline.
-    """
-    from scraper import scrape_nse_data
-
-    # Step 1: Run the scraping graph to get initial data
-    scrape_result = scrape_nse_data(sector=sector)
-    scraped_df = scrape_result.get("results_dataframe", pd.DataFrame())
-    sector_summary = scrape_result.get("sector_summary", {})
-
-    # Step 2: Run the scanner pipeline
-    scan_df = scan_stocks(sector=sector, min_score=min_score, min_rsi=min_rsi)
-
-    # Step 3: Compute Nifty 50 vs broader counts
-    nifty50_count = 0
-    broader_count = 0
-    if not scan_df.empty and "Index" in scan_df.columns:
-        nifty50_count = int((scan_df["Index"] == "NIFTY 50").sum())
-        broader_count = len(scan_df) - nifty50_count
-
-    return {
-        "results": scan_df,
-        "scraped_data": scraped_df,
-        "sector_summary": sector_summary,
-        "sector_dataframe": scrape_result.get("sector_dataframe", pd.DataFrame()),
-        "nifty50_count": nifty50_count,
-        "broader_count": broader_count,
-        "total_scanned": len(scan_df),
-    }
 
 
 if __name__ == "__main__":
